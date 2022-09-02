@@ -1,7 +1,8 @@
+from hashlib import new
 from sys import path
 import subprocess
 import nbformat as nbf
-import importlib
+import os
 import json
 import papermill as pm
 
@@ -36,7 +37,6 @@ def build_and_run(_templateName, _templateType, _data):
         parameters = json.load(read_file)
 
     # The main notebook which we will build
-    # [TODO] specify kernel and other basic info in the creation step (currently done by papermill)
     nb = nbf.v4.new_notebook()
 
     # prepare papermill inputs cell
@@ -66,10 +66,18 @@ def build_and_run(_templateName, _templateType, _data):
             + ".analysis_tools."
             + parameters["analysis"][analysis_module]["type"]
         )
+        # print(_data)
+        # print(parameters["analysis"][analysis_module]["source"])
+        # print(_data[parameters["analysis"][analysis_module]["source"]])
+        try:
+            buf_configuration = parameters["analysis"][analysis_module]["config"]
+        except KeyError:
+            buf_configuration = {}
 
         papermill_input[analysis_module] = {
             "module": module_path,
             "data": _data[parameters["analysis"][analysis_module]["source"]].__dict__,
+            "config": buf_configuration,
         }
 
         new_cells = build_module_cells(analysis_module)
@@ -91,13 +99,15 @@ def build_and_run(_templateName, _templateType, _data):
     dist_output_path = "./output_" + fname
 
     # run it with papermill
-    # [TODO] see comment on notebook creation (~line 40)
+    kernel_name = parameters["execution_specs"]["kernel_name"]
+    kernel_language = parameters["execution_specs"]["language"]
+
     pm.execute_notebook(
         dist_input_path,
         dist_output_path,
         parameters=papermill_input,
-        kernel_name="python",
-        language="python",
+        kernel_name=kernel_name,
+        language=kernel_language,
     )
 
     # convert the executed notebook to HTML
@@ -107,7 +117,8 @@ def build_and_run(_templateName, _templateType, _data):
         shell=True,
     )
 
-    # [TODO] we can now delete the template notebook
+    # we can now delete the template notebook
+    os.remove(fname)
 
     # return true to confirm everything worked fine.
     return True
